@@ -1,0 +1,12 @@
+
+{
+  "name"         : "get-election-dates",
+  "version"      : "1.0.0",
+  "description"  : "Scrape election dates",
+  "main"         : "main.js",
+  "author"       : "Frankd",
+  "dependencies" : {
+    "request"    : "latest",
+    "cheerio"    : "latest"
+  }
+}
