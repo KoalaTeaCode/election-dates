@@ -5,7 +5,8 @@
   "main": "main.js",
   "author": "Frankd",
   "dependencies": {
+    "cheerio": "latest",
     "request": "latest",
-    "cheerio": "latest"
+    "request-promise": "^4.2.6"
   }
 }
