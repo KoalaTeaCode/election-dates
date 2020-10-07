@@ -1,52 +1,65 @@
-var fs = require("fs");
-var request = require("request");
-var cheerio = require("cheerio");
+const fs = require("fs");
 
-var fileOutput = "";
-fileOutput += "Subject, Start Date\n";
+const rp = require("request-promise");
+const cheerio = require("cheerio");
+const states = require('./data/states.json')
 
-var url = "https://www.usvotefoundation.org/vote/state-elections/state-election-dates-deadlines.htm";
-request(url, function(error, response, html) {
-  var $ = cheerio.load(html);
+const url = "https://www.usvotefoundation.org/vote/state-elections/state-election-dates-deadlines.htm?stateName=";
 
-  $('.main-content').each(function(){
-    var rows = $(this).children().children().children();
-    var stateName = "UNKNOWN";
-    rows.each(function(){
-      $(this).children().filter(".state-name").first().children().filter("h1").each(function(){
-        stateName = $(this).text().replace(" (more info)", "");
-        console.log(stateName);
-      })
-      var title = "UNKNOWN";
-      $(this).children().filter(".election-title").children().filter("h2").each(function(){
-        var text = $(this).text();
-        var split = text.split(" - ");
-        var title = split[0];
-        var date = new Date(split[1]);
-        var month = date.getMonth() + 1;
-        var day = date.getDate();
-        var year = date.getFullYear();
+function saveElectionData(fileOutput) {
+  fs.writeFileSync('election-calendar.csv', fileOutput);
+}
 
-        var formattedDate = month + "/" + day + "/" + year;
-        //subject, start date
-        var rowText = "\"" + stateName + ": " + title + "\"," + formattedDate;
-        console.log("   " + title);
-        console.log("   " + date);
-        console.log("     " + rowText);
-        console.log("   ");
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-        fileOutput += rowText + "\n";
+function parseElectionHeader(text) {
+  const split = text.split(" - ");
+  const title = split[1] || "UNKNOWN";
+  const date = new Date(split[0]);
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const year = date.getFullYear();
 
-      })
+  const formattedDate = `${month}/${day}/${year}`;
+
+  return [title, formattedDate];
+}
+
+function parseHTML(html, stateName) {
+  const $ = cheerio.load(html);
+
+  const electionHeaders = $('.main-content .election-title')
+    .map(function () {
+      return $(this).text();
     })
-  })
-  console.log(fileOutput);
-  fs.writeFile('election-calendar.csv', fileOutput, function(err){
-    if(!err){
+    .get();
+  
+  const rowString = electionHeaders.map((headerText) => {
+    const parsedData = parseElectionHeader(headerText);
+    const rowItem = [stateName, ...parsedData]
+    return rowItem.join(',')
+  });
 
-      console.log('success');
-    } else {
-      console.log(err);
-    }
-  })
-})
+  return rowString.join('\n');
+}
+
+async function init() {
+  const electionOutputs = [
+    "State,Title,Start Date",
+  ];
+
+  for (const state of states) {
+    console.log(`Processing state ${state.State}`)
+    const html = await rp(`${url}${state.Code}`);
+    const row = parseHTML(html, state.State);
+    electionOutputs.push(row);
+    saveElectionData(electionOutputs.join("\n"));
+    await sleep(100);
+  }
+}
+
+(async () => {
+  await init()
+})()
